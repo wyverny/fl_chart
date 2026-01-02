@@ -167,6 +167,7 @@ class PieChartPainter extends BaseChartPainter<PieChartData> {
         sectionDegree,
         center,
         centerRadius,
+        data.roundedEdges,
       );
 
       drawSection(section, sectionPath, canvasWrapper);
@@ -184,6 +185,7 @@ class PieChartPainter extends BaseChartPainter<PieChartData> {
     double sectionDegree,
     Offset center,
     double centerRadius,
+    bool roundedEdges,
   ) {
     final sectionRadiusRect = Rect.fromCircle(
       center: center,
@@ -260,7 +262,7 @@ class PieChartPainter extends BaseChartPainter<PieChartData> {
     }
 
     // Then apply border radius to the resulting separated path
-    if (section.cornerRadius > 0) {
+    if (section.cornerRadius > 0 || roundedEdges) {
       // Get the bounds of the separated path
       final pathBounds = sectionPath.getBounds();
       if (!pathBounds.isEmpty) {
@@ -297,6 +299,7 @@ class PieChartPainter extends BaseChartPainter<PieChartData> {
             centerRadius,
             effectiveSectionRadiusRect,
             effectiveCenterRadiusRect,
+            roundedEdges,
           );
         }
       }
@@ -307,21 +310,19 @@ class PieChartPainter extends BaseChartPainter<PieChartData> {
 
   /// Generates a Path for a pie-section with rounded corners.
   ///
-  /// This method builds a path that rounds both the outer and inner
-  /// corners of a pie section (when `centerRadius > 0`). It clamps the
-  /// requested `section.cornerRadius` separately for the outer and inner
-  /// edges to avoid geometric overlap when the section is narrow or the
-  /// radii would be too large for the available arc length.
+  /// This method builds a path that rounds section ends using the middle
+  /// radius (center radius + half of section thickness). The path is
+  /// generated as a single closed shape, so it can be painted in one pass.
   ///
   /// Important behaviors / notes:
   /// - If `cornerRadius <= 1` the method returns a standard (non-rounded)
   ///   section path for performance and to avoid tiny visual artifacts.
-  /// - Outer and inner corner radii are clamped independently (`clampedOuterRadius`
-  ///   and `clampedInnerRadius`) to reasonable maxima based on section size
-  ///   and sweep angle.
-  /// - The code supports `centerRadius == 0` (fully filled pie) and
-  ///   `centerRadius > 0` (donut). When `centerRadius > 0` the inner
-  ///   corners are rounded as well.
+  /// - When `centerRadius > 0`, the rounded ends are constructed from
+  ///   half-circle caps at the mid radius, and the outer/inner arcs are
+  ///   connected to those caps.
+  /// - For `centerRadius == 0` (fully filled pie), the method falls back to
+  ///   the standard section path to avoid degenerate rounded geometry.
+  /// - For `centerRadius > 0` (donut), the inner corners are rounded as well.
   /// - `sectionsSpace` trimming is applied later by subtracting separator
   ///   rectangles from the resulting path (see `generateSectionPath`).
   /// - There are known platform/engine caveats when using `Path.combine` on
@@ -336,24 +337,22 @@ class PieChartPainter extends BaseChartPainter<PieChartData> {
     double centerRadius,
     Rect sectionRadiusRect,
     Rect centerRadiusRect,
+    bool roundedEdges,
   ) {
     final endRadians = startRadians + sweepRadians;
     final outerRadius = centerRadius + section.radius;
-    // User-provided corner radius (applies uniformly to this section).
+    // User-provided corner radius (used as a rounding enable threshold).
     final cornerRadius = section.cornerRadius;
 
     final path = Path();
 
-    if (cornerRadius <= 1) {
+    if (cornerRadius <= 1 && !roundedEdges) {
       // if corner radius is too small, return standard section path
-      final innerStart =
-          center +
+      final innerStart = center +
           Offset(math.cos(startRadians), math.sin(startRadians)) * centerRadius;
-      final outerStart =
-          center +
+      final outerStart = center +
           Offset(math.cos(startRadians), math.sin(startRadians)) * outerRadius;
-      final innerEnd =
-          center +
+      final innerEnd = center +
           Offset(math.cos(endRadians), math.sin(endRadians)) * centerRadius;
 
       path
@@ -364,188 +363,89 @@ class PieChartPainter extends BaseChartPainter<PieChartData> {
         ..arcTo(centerRadiusRect, endRadians, -sweepRadians, false)
         ..close();
     } else {
-      // Clamp requested radii to avoid overlaps. We compute a separate
-      // maximum for the outer arc (based on section radius and sweep angle)
-      // and for the inner arc (based on centerRadius). This keeps rounding
-      // visually stable across different section sizes.
-      final maxRadiusForSection = math.min(
-        section.radius * 0.3,
-        sweepRadians * outerRadius * 0.15,
+      // Use mid radius for rounding and build the section path in one pass.
+      if (centerRadius <= 0 || sweepRadians <= 0) {
+        final innerStart = center +
+            Offset(math.cos(startRadians), math.sin(startRadians)) *
+                centerRadius;
+        final outerStart = center +
+            Offset(math.cos(startRadians), math.sin(startRadians)) *
+                outerRadius;
+        final innerEnd = center +
+            Offset(math.cos(endRadians), math.sin(endRadians)) * centerRadius;
+
+        path
+          ..moveTo(innerStart.dx, innerStart.dy)
+          ..lineTo(outerStart.dx, outerStart.dy)
+          ..arcTo(sectionRadiusRect, startRadians, sweepRadians, false)
+          ..lineTo(innerEnd.dx, innerEnd.dy)
+          ..arcTo(centerRadiusRect, endRadians, -sweepRadians, false)
+          ..close();
+        return path;
+      }
+
+      final halfThickness = section.radius / 2;
+      final midRadius = centerRadius + halfThickness;
+
+      var trimmedStartRadians = startRadians;
+      var trimmedEndRadians = endRadians;
+      var trimmedSweepRadians = sweepRadians;
+      if (roundedEdges) {
+        final arcLength = sweepRadians * midRadius;
+        var reducedLength = arcLength - section.radius;
+        if (reducedLength < 0) {
+          reducedLength = 1;
+        }
+        final reducedSweepRadians = math.min(
+          sweepRadians,
+          reducedLength / midRadius,
+        );
+        final trimAngle = (sweepRadians - reducedSweepRadians) / 2;
+        trimmedStartRadians = startRadians + trimAngle;
+        trimmedEndRadians = endRadians - trimAngle;
+        trimmedSweepRadians = trimmedEndRadians - trimmedStartRadians;
+      }
+
+      final outerRect = Rect.fromCircle(center: center, radius: outerRadius);
+      final innerRect = Rect.fromCircle(center: center, radius: centerRadius);
+
+      final startMid = center +
+          Offset(math.cos(trimmedStartRadians), math.sin(trimmedStartRadians)) *
+              midRadius;
+      final endMid = center +
+          Offset(math.cos(trimmedEndRadians), math.sin(trimmedEndRadians)) *
+              midRadius;
+
+      final startCapRect = Rect.fromCircle(
+        center: startMid,
+        radius: halfThickness,
       );
-      final maxRadiusForCenter = centerRadius > 0
-          ? math.min(centerRadius * 0.3, sweepRadians * centerRadius * 0.15)
-          : 0.0;
-      final clampedOuterRadius = math.min(cornerRadius, maxRadiusForSection);
-      final clampedInnerRadius = math.min(cornerRadius, maxRadiusForCenter);
+      final endCapRect = Rect.fromCircle(
+        center: endMid,
+        radius: halfThickness,
+      );
 
-      // Compute angular offsets that correspond to the linear corner radii.
-      // These are used to trim the sweep angles so the rounded joins fit
-      // cleanly along the arc.
-      final outerAngleOffset = outerRadius > 0
-          ? clampedOuterRadius / outerRadius
-          : 0.0;
-      final innerAngleOffset = centerRadius > 0
-          ? clampedInnerRadius / centerRadius
-          : 0.0;
-
-      // Tight angles for outside corners
-      final outerStartAngle = startRadians + outerAngleOffset;
-      final outerEndAngle = endRadians - outerAngleOffset;
-      final outerSweepAngle = sweepRadians - (2 * outerAngleOffset);
-
-      // Tight angles for inside corners
-      final innerStartAngle = startRadians + innerAngleOffset;
-      final innerEndAngle = endRadians - innerAngleOffset;
-      final innerSweepAngle = sweepRadians - (2 * innerAngleOffset);
-
-      // Points of the outer corners
-      final outerStartPoint =
-          center +
-          Offset(math.cos(startRadians), math.sin(startRadians)) * outerRadius;
-      final outerEndPoint =
-          center +
-          Offset(math.cos(endRadians), math.sin(endRadians)) * outerRadius;
-      final outerStartRounded =
-          center +
-          Offset(math.cos(outerStartAngle), math.sin(outerStartAngle)) *
-              outerRadius;
-      final outerEndRounded =
-          center +
-          Offset(math.cos(outerEndAngle), math.sin(outerEndAngle)) *
+      final outerStart = center +
+          Offset(math.cos(trimmedStartRadians), math.sin(trimmedStartRadians)) *
               outerRadius;
 
-      // Points of the inner corners
-      final innerStartPoint =
-          center +
-          Offset(math.cos(startRadians), math.sin(startRadians)) * centerRadius;
-      final innerEndPoint =
-          center +
-          Offset(math.cos(endRadians), math.sin(endRadians)) * centerRadius;
-      final innerStartRounded =
-          center +
-          Offset(math.cos(innerStartAngle), math.sin(innerStartAngle)) *
-              centerRadius;
-      final innerEndRounded =
-          center +
-          Offset(math.cos(innerEndAngle), math.sin(innerEndAngle)) *
-              centerRadius;
-
-      // Control points used to connect the rounded corner bezier segments to
-      // the inner/outer arcs. They lie along the original radial directions
-      // but offset inward/outward by the clamped radii.
-      final startOuterControl =
-          center +
-          Offset(math.cos(startRadians), math.sin(startRadians)) *
-              (outerRadius - clampedOuterRadius);
-      final endOuterControl =
-          center +
-          Offset(math.cos(endRadians), math.sin(endRadians)) *
-              (outerRadius - clampedOuterRadius);
-      final startInnerControl =
-          center +
-          Offset(math.cos(startRadians), math.sin(startRadians)) *
-              (centerRadius + clampedInnerRadius);
-      final endInnerControl =
-          center +
-          Offset(math.cos(endRadians), math.sin(endRadians)) *
-              (centerRadius + clampedInnerRadius);
-
-      // Build the rounded path step by step
-      if (centerRadius > 0) {
-        // Start from the inner rounded corner
-        path.moveTo(innerStartRounded.dx, innerStartRounded.dy);
-
-        // Inner starting rounded corner (quadratic join). If the inner
-        // radius is small we fall back to a straight line to avoid tiny
-        // bezier segments.
-        if (clampedInnerRadius > 1) {
-          path.quadraticBezierTo(
-            innerStartPoint.dx,
-            innerStartPoint.dy,
-            startInnerControl.dx,
-            startInnerControl.dy,
-          );
-        } else {
-          path.lineTo(innerStartPoint.dx, innerStartPoint.dy);
-        }
-
-        // Straight line to the outer edge
-        path.lineTo(startOuterControl.dx, startOuterControl.dy);
-
-        // Outer starting rounded corner (quadratic join).
-        if (clampedOuterRadius > 1) {
-          path.quadraticBezierTo(
-            outerStartPoint.dx,
-            outerStartPoint.dy,
-            outerStartRounded.dx,
-            outerStartRounded.dy,
-          );
-        } else {
-          path.lineTo(outerStartPoint.dx, outerStartPoint.dy);
-        }
-      } else {
-        // If there is no centerRadius, start from the center
-        path
-          ..moveTo(center.dx, center.dy)
-          ..lineTo(startOuterControl.dx, startOuterControl.dy);
-
-        if (clampedOuterRadius > 1) {
-          path.quadraticBezierTo(
-            outerStartPoint.dx,
-            outerStartPoint.dy,
-            outerStartRounded.dx,
-            outerStartRounded.dy,
-          );
-        } else {
-          path.lineTo(outerStartPoint.dx, outerStartPoint.dy);
-        }
-      }
-
-      // Draw the outer arc between the two rounded outer corner points.
-      if (outerSweepAngle > 0) {
-        path.arcTo(sectionRadiusRect, outerStartAngle, outerSweepAngle, false);
-      }
-
-      // Outer ending rounded corner (quadratic join).
-      if (clampedOuterRadius > 1) {
-        path
-          ..lineTo(outerEndRounded.dx, outerEndRounded.dy)
-          ..quadraticBezierTo(
-            outerEndPoint.dx,
-            outerEndPoint.dy,
-            endOuterControl.dx,
-            endOuterControl.dy,
-          );
-      } else {
-        path.lineTo(outerEndPoint.dx, outerEndPoint.dy);
-      }
-
-      if (centerRadius > 0) {
-        // Straight line to the inner edge
-        path.lineTo(endInnerControl.dx, endInnerControl.dy);
-
-        // Inner ending rounded corner (quadratic join).
-        if (clampedInnerRadius > 1) {
-          path.quadraticBezierTo(
-            innerEndPoint.dx,
-            innerEndPoint.dy,
-            innerEndRounded.dx,
-            innerEndRounded.dy,
-          );
-        } else {
-          path.lineTo(innerEndPoint.dx, innerEndPoint.dy);
-        }
-
-        // Draw the inner arc between the two rounded inner corner points.
-        if (innerSweepAngle > 0) {
-          path.arcTo(centerRadiusRect, innerEndAngle, -innerSweepAngle, false);
-        }
-      } else {
-        // If there is no centerRadius, close towards the center
-        path.lineTo(center.dx, center.dy);
-      }
-
-      path.close();
+      path
+        ..moveTo(outerStart.dx, outerStart.dy)
+        ..arcTo(
+          outerRect,
+          trimmedStartRadians,
+          trimmedSweepRadians,
+          false,
+        )
+        ..arcTo(endCapRect, trimmedEndRadians, math.pi, false)
+        ..arcTo(
+          innerRect,
+          trimmedEndRadians,
+          -trimmedSweepRadians,
+          false,
+        )
+        ..arcTo(startCapRect, trimmedStartRadians + math.pi, math.pi, false)
+        ..close();
     }
 
     return path;
@@ -719,9 +619,8 @@ class PieChartPainter extends BaseChartPainter<PieChartData> {
     if (data.centerSpaceRadius.isFinite) {
       return data.centerSpaceRadius;
     }
-    final maxRadius = data.sections
-        .reduce((a, b) => a.radius > b.radius ? a : b)
-        .radius;
+    final maxRadius =
+        data.sections.reduce((a, b) => a.radius > b.radius ? a : b).radius;
     return (viewSize.shortestSide - (maxRadius * 2)) / 2;
   }
 
@@ -778,6 +677,7 @@ class PieChartPainter extends BaseChartPainter<PieChartData> {
         sectionAngle,
         center,
         centerRadius,
+        data.roundedEdges,
       );
 
       if (sectionPath.contains(localPosition)) {
