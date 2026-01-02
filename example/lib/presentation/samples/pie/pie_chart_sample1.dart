@@ -119,9 +119,9 @@ class PieChartSample1State extends State {
               radius: 80,
               titlePositionPercentageOffset: 0.55,
               borderSide: isTouched
-                  ? const BorderSide(
+                  ? const FlBorderSide(
                       color: AppColors.contentColorWhite, width: 6)
-                  : BorderSide(
+                  : FlBorderSide(
                       color: AppColors.contentColorWhite.withValues(alpha: 0)),
             ),
           1 => PieChartSectionData(
@@ -131,9 +131,9 @@ class PieChartSample1State extends State {
               radius: 65,
               titlePositionPercentageOffset: 0.55,
               borderSide: isTouched
-                  ? const BorderSide(
+                  ? const FlBorderSide(
                       color: AppColors.contentColorWhite, width: 6)
-                  : BorderSide(
+                  : FlBorderSide(
                       color: AppColors.contentColorWhite.withValues(alpha: 0)),
             ),
           2 => PieChartSectionData(
@@ -143,9 +143,9 @@ class PieChartSample1State extends State {
               radius: 60,
               titlePositionPercentageOffset: 0.6,
               borderSide: isTouched
-                  ? const BorderSide(
+                  ? const FlBorderSide(
                       color: AppColors.contentColorWhite, width: 6)
-                  : BorderSide(
+                  : FlBorderSide(
                       color: AppColors.contentColorWhite.withValues(alpha: 0)),
             ),
           3 => PieChartSectionData(
@@ -155,9 +155,9 @@ class PieChartSample1State extends State {
               radius: 70,
               titlePositionPercentageOffset: 0.55,
               borderSide: isTouched
-                  ? const BorderSide(
+                  ? const FlBorderSide(
                       color: AppColors.contentColorWhite, width: 6)
-                  : BorderSide(
+                  : FlBorderSide(
                       color: AppColors.contentColorWhite.withValues(alpha: 0)),
             ),
           _ => throw StateError('Invalid'),

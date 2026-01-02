@@ -171,7 +171,7 @@ class PieChartSectionData with EquatableMixin {
     bool? showTitle,
     this.titleStyle,
     String? title,
-    BorderSide? borderSide,
+    FlBorderSide? borderSide,
     double? cornerRadius,
     this.badgeWidget,
     double? titlePositionPercentageOffset,
@@ -181,7 +181,7 @@ class PieChartSectionData with EquatableMixin {
         radius = radius ?? 40,
         showTitle = showTitle ?? true,
         title = title ?? (value == null ? '' : value.toString()),
-        borderSide = borderSide ?? const BorderSide(width: 0),
+        borderSide = borderSide ?? FlBorderSide.none,
         cornerRadius = cornerRadius ?? 0.0,
         titlePositionPercentageOffset = titlePositionPercentageOffset ?? 0.5,
         badgePositionPercentageOffset = badgePositionPercentageOffset ?? 0.5;
@@ -212,8 +212,9 @@ class PieChartSectionData with EquatableMixin {
   /// Defines text of showing title at the middle of section.
   final String title;
 
-  /// Defines border stroke around the section
-  final BorderSide borderSide;
+  /// Defines border stroke around the section.
+  /// Use [FlBorderStyle.dotted] for dotted borders.
+  final FlBorderSide borderSide;
 
   /// Defines corner radius for rounded edges (applies to all corners)
   final double cornerRadius;
@@ -248,7 +249,7 @@ class PieChartSectionData with EquatableMixin {
     bool? showTitle,
     TextStyle? titleStyle,
     String? title,
-    BorderSide? borderSide,
+    FlBorderSide? borderSide,
     double? cornerRadius,
     Widget? badgeWidget,
     double? titlePositionPercentageOffset,
@@ -285,7 +286,7 @@ class PieChartSectionData with EquatableMixin {
         showTitle: b.showTitle,
         titleStyle: TextStyle.lerp(a.titleStyle, b.titleStyle, t),
         title: b.title,
-        borderSide: BorderSide.lerp(a.borderSide, b.borderSide, t),
+        borderSide: FlBorderSide.lerp(a.borderSide, b.borderSide, t),
         cornerRadius: lerpDouble(a.cornerRadius, b.cornerRadius, t),
         badgeWidget: b.badgeWidget,
         titlePositionPercentageOffset: lerpDouble(

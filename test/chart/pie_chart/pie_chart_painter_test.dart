@@ -181,7 +181,7 @@ void main() {
           color: MockData.color2,
           radius: radius,
           value: 10,
-          borderSide: const BorderSide(
+          borderSide: const FlBorderSide(
             color: MockData.color3,
             width: 3,
           ),
@@ -767,22 +767,22 @@ void main() {
           PieChartSectionData(
             color: MockData.color1,
             value: 1,
-            borderSide: MockData.borderSide1,
+            borderSide: MockData.flBorderSide1,
           ),
           PieChartSectionData(
             color: MockData.color2,
             value: 2,
-            borderSide: MockData.borderSide2,
+            borderSide: MockData.flBorderSide2,
           ),
           PieChartSectionData(
             color: MockData.color3,
             value: 3,
-            borderSide: MockData.borderSide3,
+            borderSide: MockData.flBorderSide3,
           ),
           PieChartSectionData(
             color: MockData.color4,
             value: 4,
-            borderSide: MockData.borderSide4,
+            borderSide: MockData.flBorderSide4,
           ),
         ],
       );
@@ -859,7 +859,7 @@ void main() {
       expect(drawPathResults[0]['paint_style'], PaintingStyle.stroke);
       expect(
         drawPathResults[0]['paint_stroke_width'],
-        MockData.borderSide1.width * 2,
+        MockData.flBorderSide1.width * 2,
       );
 
       expect(drawPathResults[1]['path'], MockData.path2);
@@ -870,7 +870,7 @@ void main() {
       expect(drawPathResults[1]['paint_style'], PaintingStyle.stroke);
       expect(
         drawPathResults[1]['paint_stroke_width'],
-        MockData.borderSide2.width * 2,
+        MockData.flBorderSide2.width * 2,
       );
 
       expect(drawPathResults[2]['path'], MockData.path3);
@@ -881,7 +881,7 @@ void main() {
       expect(drawPathResults[2]['paint_style'], PaintingStyle.stroke);
       expect(
         drawPathResults[2]['paint_stroke_width'],
-        MockData.borderSide3.width * 2,
+        MockData.flBorderSide3.width * 2,
       );
 
       expect(drawPathResults[3]['path'], MockData.path4);
@@ -892,7 +892,7 @@ void main() {
       expect(drawPathResults[3]['paint_style'], PaintingStyle.stroke);
       expect(
         drawPathResults[3]['paint_stroke_width'],
-        MockData.borderSide4.width * 2,
+        MockData.flBorderSide4.width * 2,
       );
 
       verify(mockCanvasWrapper.restore()).called(4);
@@ -906,7 +906,7 @@ void main() {
         PieChartSectionData(
           color: MockData.color1,
           value: 1,
-          borderSide: MockData.borderSide1,
+          borderSide: MockData.flBorderSide1,
           showTitle: true,
           titleStyle: MockData.textStyle1,
           radius: 11,
@@ -914,7 +914,7 @@ void main() {
         PieChartSectionData(
           color: MockData.color2,
           value: 2,
-          borderSide: MockData.borderSide2,
+          borderSide: MockData.flBorderSide2,
           showTitle: true,
           titleStyle: MockData.textStyle2,
           radius: 22,
@@ -923,7 +923,7 @@ void main() {
         PieChartSectionData(
           color: MockData.color3,
           value: 3,
-          borderSide: MockData.borderSide3,
+          borderSide: MockData.flBorderSide3,
           showTitle: false,
           titleStyle: MockData.textStyle3,
           radius: 33,
@@ -931,7 +931,7 @@ void main() {
         PieChartSectionData(
           color: MockData.color4,
           value: 4,
-          borderSide: MockData.borderSide4,
+          borderSide: MockData.flBorderSide4,
           showTitle: true,
           titleStyle: MockData.textStyle4,
           radius: 44,
@@ -965,25 +965,25 @@ void main() {
           PieChartSectionData(
             color: MockData.color1,
             value: 1,
-            borderSide: MockData.borderSide1,
+            borderSide: MockData.flBorderSide1,
             radius: 10,
           ),
           PieChartSectionData(
             color: MockData.color2,
             value: 2,
-            borderSide: MockData.borderSide2,
+            borderSide: MockData.flBorderSide2,
             radius: 20,
           ),
           PieChartSectionData(
             color: MockData.color3,
             value: 3,
-            borderSide: MockData.borderSide3,
+            borderSide: MockData.flBorderSide3,
             radius: 30,
           ),
           PieChartSectionData(
             color: MockData.color4,
             value: 4,
-            borderSide: MockData.borderSide4,
+            borderSide: MockData.flBorderSide4,
             radius: 40,
           ),
         ],
@@ -1225,22 +1225,22 @@ void main() {
           PieChartSectionData(
             color: MockData.color1,
             value: 1,
-            borderSide: MockData.borderSide1,
+            borderSide: MockData.flBorderSide1,
           ),
           PieChartSectionData(
             color: MockData.color2,
             value: 2,
-            borderSide: MockData.borderSide2,
+            borderSide: MockData.flBorderSide2,
           ),
           PieChartSectionData(
             color: MockData.color3,
             value: 3,
-            borderSide: MockData.borderSide3,
+            borderSide: MockData.flBorderSide3,
           ),
           PieChartSectionData(
             color: MockData.color4,
             value: 4,
-            borderSide: MockData.borderSide4,
+            borderSide: MockData.flBorderSide4,
           ),
         ],
       );

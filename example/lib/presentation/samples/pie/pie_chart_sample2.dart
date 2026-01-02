@@ -47,6 +47,7 @@ class PieChart2State extends State {
                   sectionsSpace: 0,
                   centerSpaceRadius: 40,
                   sections: showingSections(),
+                  roundedEdges: true,
                 ),
               ),
             ),
@@ -114,6 +115,12 @@ class PieChart2State extends State {
               fontWeight: FontWeight.bold,
               color: AppColors.mainTextColor1,
               shadows: shadows,
+            ),
+            borderSide: FlBorderSide(
+              color: isTouched ? Colors.amber : Colors.purple,
+              width: 3,
+              style: FlBorderStyle.dotted,
+              strokeAlign: -1.0,
             ),
           ),
         1 => PieChartSectionData(

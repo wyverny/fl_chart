@@ -69,6 +69,10 @@ class MockData {
   static const borderSide4 = BorderSide(color: color4, width: 4);
   static const borderSide5 = BorderSide(color: color5, width: 5);
   static const borderSide6 = BorderSide(color: color6, width: 6);
+  static const flBorderSide1 = FlBorderSide(color: color1);
+  static const flBorderSide2 = FlBorderSide(color: color2, width: 2);
+  static const flBorderSide3 = FlBorderSide(color: color3, width: 3);
+  static const flBorderSide4 = FlBorderSide(color: color4, width: 4);
 
   static const TextStyle textStyle1 =
       TextStyle(color: color1, fontWeight: FontWeight.w100);

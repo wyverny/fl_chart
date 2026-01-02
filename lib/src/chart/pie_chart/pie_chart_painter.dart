@@ -5,6 +5,7 @@ import 'package:fl_chart/src/chart/base/base_chart/base_chart_painter.dart';
 import 'package:fl_chart/src/chart/base/line.dart';
 import 'package:fl_chart/src/chart/pie_chart/pie_chart_data.dart';
 import 'package:fl_chart/src/extensions/paint_extension.dart';
+import 'package:fl_chart/src/extensions/path_extension.dart';
 import 'package:fl_chart/src/utils/canvas_wrapper.dart';
 import 'package:fl_chart/src/utils/utils.dart';
 import 'package:flutter/material.dart';
@@ -138,24 +139,55 @@ class PieChartPainter extends BaseChartPainter<PieChartData> {
           )
           ..restore();
         _sectionPaint.blendMode = BlendMode.srcOver;
-        if (section.borderSide.width != 0.0 &&
-            section.borderSide.color.a != 0.0) {
+        if (section.borderSide.isVisible) {
+          final isInside = section.borderSide.strokeAlign < 0;
           _sectionStrokePaint
-            ..strokeWidth = section.borderSide.width
-            ..color = section.borderSide.color;
-          // Outer
-          canvasWrapper
-            ..drawCircle(
-              center,
-              centerRadius + section.radius - (section.borderSide.width / 2),
-              _sectionStrokePaint,
-            )
-            // Inner
-            ..drawCircle(
-              center,
-              centerRadius + (section.borderSide.width / 2),
-              _sectionStrokePaint,
-            );
+            ..strokeWidth = isInside
+                ? section.borderSide.width * 2
+                : section.borderSide.width
+            ..color = section.borderSide.color
+            ..strokeCap = section.borderSide.style == FlBorderStyle.dotted
+                ? StrokeCap.round
+                : StrokeCap.butt;
+          final outerRadius = centerRadius + section.radius;
+          final innerRadius = centerRadius;
+          if (isInside) {
+            final ringPath = Path()
+              ..addOval(Rect.fromCircle(center: center, radius: outerRadius))
+              ..addOval(Rect.fromCircle(center: center, radius: innerRadius))
+              ..fillType = PathFillType.evenOdd;
+            canvasWrapper
+              ..saveLayer(bounds, _clipPaint)
+              ..clipPath(ringPath);
+          }
+          if (section.borderSide.style == FlBorderStyle.dotted) {
+            final dashArray = _dottedDashArray(section.borderSide.width);
+            final outerPath = Path()
+              ..addOval(Rect.fromCircle(center: center, radius: outerRadius));
+            final innerPath = Path()
+              ..addOval(Rect.fromCircle(center: center, radius: innerRadius));
+            canvasWrapper
+              ..drawPath(outerPath.toDashedPath(dashArray), _sectionStrokePaint)
+              ..drawPath(
+                  innerPath.toDashedPath(dashArray), _sectionStrokePaint);
+          } else {
+            // Outer
+            canvasWrapper
+              ..drawCircle(
+                center,
+                outerRadius,
+                _sectionStrokePaint,
+              )
+              // Inner
+              ..drawCircle(
+                center,
+                innerRadius,
+                _sectionStrokePaint,
+              );
+          }
+          if (isInside) {
+            canvasWrapper.restore();
+          }
         }
         return;
       }
@@ -167,11 +199,32 @@ class PieChartPainter extends BaseChartPainter<PieChartData> {
         sectionDegree,
         center,
         centerRadius,
-        data.roundedEdges,
+        roundedEdges: data.roundedEdges,
       );
 
-      drawSection(section, sectionPath, canvasWrapper);
-      drawSectionStroke(section, sectionPath, canvasWrapper, viewSize);
+      drawSection(
+        section,
+        sectionPath,
+        canvasWrapper,
+        data.sectionsSpace,
+        tempAngle,
+        sectionDegree,
+        center,
+        centerRadius,
+        data.roundedEdges,
+      );
+      drawSectionStroke(
+        section,
+        sectionPath,
+        canvasWrapper,
+        viewSize,
+        data.sectionsSpace,
+        tempAngle,
+        sectionDegree,
+        center,
+        centerRadius,
+        data.roundedEdges,
+      );
       tempAngle += sectionDegree;
     }
   }
@@ -184,9 +237,9 @@ class PieChartPainter extends BaseChartPainter<PieChartData> {
     double tempAngle,
     double sectionDegree,
     Offset center,
-    double centerRadius,
-    bool roundedEdges,
-  ) {
+    double centerRadius, {
+    bool roundedEdges = false,
+  }) {
     final sectionRadiusRect = Rect.fromCircle(
       center: center,
       radius: centerRadius + section.radius,
@@ -504,15 +557,53 @@ class PieChartPainter extends BaseChartPainter<PieChartData> {
     PieChartSectionData section,
     Path sectionPath,
     CanvasWrapper canvasWrapper,
+    double sectionSpace,
+    double tempAngle,
+    double sectionDegree,
+    Offset center,
+    double centerRadius,
+    bool roundedEdges,
   ) {
+    final fillPath = section.borderSide.isVisible
+        ? () {
+            final strokeAlign = section.borderSide.strokeAlign;
+            final inset = math.max(
+              0.0,
+              section.borderSide.width * (0.5 - (strokeAlign / 2)),
+            );
+            final adjustedCenterRadius = centerRadius + inset;
+            final adjustedSectionRadius =
+                math.max(0.0, section.radius - (inset * 2));
+            final adjustedSectionSpace = math.max(
+              0.0,
+              sectionSpace - (strokeAlign * section.borderSide.width),
+            );
+            if (adjustedSectionRadius == 0) {
+              return null;
+            }
+            final alignedSection =
+                section.copyWith(radius: adjustedSectionRadius);
+            return generateSectionPath(
+              alignedSection,
+              adjustedSectionSpace,
+              tempAngle,
+              sectionDegree,
+              center,
+              adjustedCenterRadius,
+              roundedEdges: roundedEdges,
+            );
+          }()
+        : sectionPath;
     _sectionPaint
       ..setColorOrGradient(
         section.color,
         section.gradient,
-        sectionPath.getBounds(),
+        (fillPath ?? sectionPath).getBounds(),
       )
       ..style = PaintingStyle.fill;
-    canvasWrapper.drawPath(sectionPath, _sectionPaint);
+    if (fillPath != null) {
+      canvasWrapper.drawPath(fillPath, _sectionPaint);
+    }
   }
 
   @visibleForTesting
@@ -521,22 +612,62 @@ class PieChartPainter extends BaseChartPainter<PieChartData> {
     Path sectionPath,
     CanvasWrapper canvasWrapper,
     Size viewSize,
+    double sectionSpace,
+    double tempAngle,
+    double sectionDegree,
+    Offset center,
+    double centerRadius,
+    bool roundedEdges,
   ) {
-    if (section.borderSide.width != 0.0 && section.borderSide.color.a != 0.0) {
-      canvasWrapper
-        ..saveLayer(
-          Rect.fromLTWH(0, 0, viewSize.width, viewSize.height),
-          _clipPaint,
-        )
-        ..clipPath(sectionPath);
-
+    if (section.borderSide.isVisible) {
+      final strokeAlign = section.borderSide.strokeAlign;
+      final strokeWidth = section.borderSide.width;
+      final alignedPath = strokeAlign == 0.0
+          ? sectionPath
+          : () {
+              final inset = -strokeAlign * strokeWidth / 2;
+              final adjustedCenterRadius = math.max(0.0, centerRadius + inset);
+              final adjustedSectionRadius = math.max(
+                0.0,
+                section.radius - (inset * 2),
+              );
+              final adjustedSectionSpace = sectionSpace +
+                  (section.borderSide.width * strokeAlign.abs() / 2);
+              if (adjustedSectionRadius == 0) {
+                return null;
+              }
+              final alignedSection =
+                  section.copyWith(radius: adjustedSectionRadius);
+              return generateSectionPath(
+                alignedSection,
+                adjustedSectionSpace,
+                tempAngle,
+                sectionDegree,
+                center,
+                adjustedCenterRadius,
+                roundedEdges: roundedEdges,
+              );
+            }();
+      if (alignedPath == null) {
+        return;
+      }
+      final strokePath = section.borderSide.style == FlBorderStyle.dotted
+          ? alignedPath.toDashedPath(_dottedDashArray(section.borderSide.width))
+          : alignedPath;
       _sectionStrokePaint
-        ..strokeWidth = section.borderSide.width * 2
-        ..color = section.borderSide.color;
-      canvasWrapper
-        ..drawPath(sectionPath, _sectionStrokePaint)
-        ..restore();
+        ..strokeWidth = strokeWidth
+        ..color = section.borderSide.color
+        ..strokeCap = section.borderSide.style == FlBorderStyle.dotted
+            ? StrokeCap.round
+            : StrokeCap.butt;
+      canvasWrapper.drawPath(strokePath, _sectionStrokePaint);
     }
+  }
+
+  List<int> _dottedDashArray(double strokeWidth) {
+    final dotLength = math.max(1, strokeWidth.round());
+    final gapLength = math.max(1, (strokeWidth * 1.5).round());
+    return [dotLength, gapLength];
   }
 
   /// Calculates layout of overlaying elements, includes:
@@ -677,7 +808,7 @@ class PieChartPainter extends BaseChartPainter<PieChartData> {
         sectionAngle,
         center,
         centerRadius,
-        data.roundedEdges,
+        roundedEdges: data.roundedEdges,
       );
 
       if (sectionPath.contains(localPosition)) {
